@@ -2,6 +2,67 @@ import pyautogui
 import time
 import cv2
 import numpy as np
+import pytesseract
+import requests
+from io import BytesIO
+
+def ocr_api_request(image_data):
+    """Send image to OCR API and return extracted text."""
+    url = "https://ocr-llm.arshadyaseen.com/api/extract"
+    files = {'images': ('image.png', BytesIO(image_data), 'image/png')}
+    response = requests.post(url, files=files)
+    if response.status_code == 200:
+        return response.json().get("results", [{}])[0].get("content", "")
+    return ""
+
+def detect_egg_text_via_api():
+    """Detect if 'Egg' is present using the OCR API."""
+    start_time = time.time()
+    print("detect egg via API...")
+    screenshot = screenshot_retroarch()
+    if screenshot is None:
+        return False
+    processed_image = preprocess_image(screenshot)
+    _, image_encoded = cv2.imencode('.png', processed_image)
+    extracted_text = ocr_api_request(image_encoded.tobytes())
+    elapsed_time = time.time() - start_time
+    print(f"detect_egg_text_via_api took {elapsed_time:.4f} seconds")
+    print("OCR API Output:", extracted_text)
+    return "Egg" in extracted_text
+
+def screenshot_retroarch():
+    """Capture a screenshot of the RetroArch window only."""
+    start_time = time.time()
+    print("Capturing screenshot...")
+    ss = pyautogui.screenshot()
+    print("Capturing screenshot Done...")
+    elapsed_time = time.time() - start_time
+    print(f"screenshot_retroarch took {elapsed_time:.4f} seconds")
+    return np.array(ss)
+
+def preprocess_image(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    upscaled = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    binary = cv2.threshold(upscaled, 150, 255, cv2.THRESH_BINARY_INV)[1]
+    return binary
+
+def detect_egg_text():
+    """Check if the word 'Egg' is visible in the inventory."""
+    print("Detecting Egg text...")
+    screenshot = screenshot_retroarch()
+    if screenshot is None:
+        return False
+
+    processed_image = preprocess_image(screenshot)
+
+    print("Processing Egg text...")
+    # Use pytesseract to extract text
+    text = pytesseract.image_to_string(processed_image)
+
+    print(f"Detecting Egg text... f{text}")
+
+    # Check if "Egg" appears in the extracted text
+    return "Egg" in text
 
 def run_in_circles():
     """Simulate running in circles to hatch eggs."""
@@ -21,7 +82,7 @@ def run_in_circles():
                         print("Egg hatching detected! Stopping movement...")
                         pyautogui.press("z")
                         pyautogui.press("z")
-                        time.sleep(10)
+                        time.sleep(7)
                         pyautogui.press("z")
                         pyautogui.press("z")
                         pyautogui.press("z")
@@ -52,14 +113,19 @@ def main():
 
     while True:
         run_in_circles()
+        pyautogui.press("return")
+        time.sleep(1)
+        pyautogui.press("x")
+        time.sleep(3)
+        if detect_egg_text_via_api() is not True:
+            print("Egg not exists anymore. Stopping script...")
+            break
+        else:
+            pyautogui.press("z")
+            time.sleep(3)
+            pyautogui.press("z")
+            time.sleep(1)
+
 
 if __name__ == "__main__":
     main()
-
-# below is script to screenshot
-# import pyautogui
-# import os
-# print(pyautogui.position())
-# print(os.getcwd())
-# image=pyautogui.screenshot("/Users/ridhoperdana/workspace/pokemonhatch/test.png", region=(0, 670, 700, 200))
-# image.save('/Users/ridhoperdana/workspace/pokemonhatch/hatch.png')
