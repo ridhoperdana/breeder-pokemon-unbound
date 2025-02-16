@@ -3,3 +3,4 @@ opencv-python
 numpy
 pyscreeze
 pytesseract
+easyocr

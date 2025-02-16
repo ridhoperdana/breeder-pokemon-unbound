@@ -6,6 +6,9 @@ import pytesseract
 import requests
 from io import BytesIO
 
+import easyocr
+import json
+
 def ocr_api_request(image_data):
     """Send image to OCR API and return extracted text."""
     url = "https://ocr-llm.arshadyaseen.com/api/extract"
@@ -46,8 +49,8 @@ def preprocess_image(image):
     binary = cv2.threshold(upscaled, 150, 255, cv2.THRESH_BINARY_INV)[1]
     return binary
 
-def detect_egg_text():
-    """Check if the word 'Egg' is visible in the inventory."""
+def detect_egg_text_tesseract():
+    """Check if the word 'Egg' is visible in the inventory. Using tesseract."""
     print("Detecting Egg text...")
     screenshot = screenshot_retroarch()
     if screenshot is None:
@@ -66,7 +69,6 @@ def detect_egg_text():
 
 def run_in_circles():
     """Simulate running in circles to hatch eggs."""
-    start_time = time.time()
     directions = ["right", "down", "left", "up"]  # Circular pattern
 
     try:
@@ -107,6 +109,37 @@ def detect_hatch(screen_region=(0, 670, 700, 200), hatch_template="test.png"):
 
     return max_val > 0.8  # Adjust threshold as needed
 
+def detect_egg_easy_ocr():
+    start_time = time.time()
+    print("detect egg via easy ocr...")
+    screenshot = screenshot_retroarch()
+    if screenshot is None:
+        return False
+    processed_image = preprocess_image(screenshot)
+    # _, image_encoded = cv2.imencode('.png', processed_image)
+    reader = easyocr.Reader(['en'])
+    result = reader.readtext(processed_image)
+    print("detect text easyocr Done...")
+    elapsed_time = time.time() - start_time
+    print(f"detect_egg_easy_ocr took {elapsed_time:.4f} seconds")
+    parsed_results = []
+    for (bbox, text, confidence) in result:
+        parsed_results.append({
+            "bounding_box": [list(map(int, bbox[0])), list(map(int, bbox[1])), list(map(int, bbox[2])),
+                             list(map(int, bbox[3]))],  # Convert NumPy int32 to Python int
+            "text": text,
+            "confidence": float(confidence)  # Convert NumPy float32 to Python float
+        })
+
+    res = json.loads(json.dumps(parsed_results))
+
+    is_egg_found = False
+    for i in res:
+        if i["text"] == "Egg":
+            is_egg_found = True
+            break
+    return is_egg_found
+
 def main():
     """Main automation loop."""
     print("Starting Pokémon Egg Hatching Automation...")
@@ -117,12 +150,12 @@ def main():
         time.sleep(1)
         pyautogui.press("x")
         time.sleep(3)
-        if detect_egg_text_via_api() is not True:
+        if detect_egg_easy_ocr() is not True:
             print("Egg not exists anymore. Stopping script...")
             break
         else:
             pyautogui.press("z")
-            time.sleep(3)
+            time.sleep(2)
             pyautogui.press("z")
             time.sleep(1)
 
